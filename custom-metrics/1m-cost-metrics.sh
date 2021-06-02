@@ -21,9 +21,9 @@ cluster_config_file="${monitoring_home}/parallelcluster-setup/cluster-config.jso
 compute_nodes_total_cost=0
 
 for queue in $queues; do 
+instance_types=$(cat "${cluster_config_file}" | jq -r --arg queue $queue '.cluster.queue_settings | to_entries[] | select(.key==$queue).value.compute_resource_settings | to_entries[]| .value.instance_type')
 
-  instance_type=$(cat "${cluster_config_file}" | jq -r --arg queue $queue '.cluster.queue_settings | to_entries[] | select(.key==$queue).value.compute_resource_settings | to_entries[]| .value.instance_type')
-
+for instance_type in ${instance_types}; do
   compute_node_h_price=$(aws pricing get-products \
     --region us-east-1 \
     --service-code AmazonEC2 \
@@ -53,7 +53,7 @@ for queue in $queues; do
   compute_nodes_cost=$(echo "scale=2; $total_num_compute_nodes * $compute_node_h_price" | bc)
   
   compute_nodes_total_cost=$(echo "scale=2; $compute_nodes_total_cost + $compute_nodes_cost" | bc)
-
+done
 done 
 
 echo "ebs_compute_cost $compute_ebs_volume_cost"    | curl --data-binary @- http://127.0.0.1:9091/metrics/job/cost
