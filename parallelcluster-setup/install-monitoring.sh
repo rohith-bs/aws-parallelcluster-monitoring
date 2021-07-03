@@ -104,8 +104,10 @@ case "${cfn_node_type}" in
 			yum -y install nvidia-docker2
 			systemctl restart docker
 			/usr/local/bin/docker-compose -f /home/${cfn_cluster_user}/${monitoring_dir_name}/docker-compose/docker-compose.compute.gpu.yml -p monitoring-compute up -d
-        else
+        	else
 			/usr/local/bin/docker-compose -f /home/${cfn_cluster_user}/${monitoring_dir_name}/docker-compose/docker-compose.compute.yml -p monitoring-compute up -d
-        fi
+        	fi
 	;;
+	*)
+    	;;
 esac
