@@ -9,14 +9,20 @@
 #source the AWS ParallelCluster profile
 . /etc/parallelcluster/cfnconfig
 
-yum -y install docker
-service docker start
-chkconfig docker on
-usermod -a -G docker $cfn_cluster_user
+if [ ! -x "$(command -v docker)" ]; then
+	echo "Setting Up docker in rootless mode"
+	curl -fsSL https://get.docker.com | sh 
+	apt install -y newuidmap newgidmap
+	echo "systemctl --user start docker" | sudo -u ${cfn_cluster_user}
+	echo "systemctl --user enable docker" | sudo -u ${cfn_cluster_user}
+	loginctl enable-linger ${cfn_cluster_user}
+	echo "export PATH=/usr/bin:\$PATH" >> /home/${cfn_cluster_user}/.bashrc
+	echo "export DOCKER_HOST=unix:///run/user/1000/docker.sock" >> /home/${cfn_cluster_user}/.bashrc
+else
+	echo "Docker is already installed [skipping]."
+fi
 
-#to be replaced with yum -y install docker-compose as the repository problem is fixed
-curl -L "https://github.com/docker/compose/releases/download/1.27.4/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-chmod +x /usr/local/bin/docker-compose
+apt install -y docker-compose
 
 monitoring_dir_name=$(echo ${cfn_postinstall_args}| cut -d ',' -f 2 )
 monitoring_home="/home/${cfn_cluster_user}/${monitoring_dir_name}"
@@ -37,7 +43,16 @@ case "${cfn_node_type}" in
 
 		aws s3api get-object --bucket $cluster_s3_bucket --key $cluster_config_s3_key --region $cfn_region --version-id $cluster_config_version ${monitoring_home}/parallelcluster-setup/cluster-config.json
 
-		yum -y install golang-bin 
+		if [ ! -x "$(command -v go)" ]; then
+			export GVERSION=1.14.12 OS=linux ARCH=amd64
+			echo "Setting up GO"
+			wget -c https://dl.google.com/go/go$GVERSION.$OS-$ARCH.tar.gz 
+			tar -xzf go$GVERSION.$OS-$ARCH.tar.gz -C /usr/local/ && rm go$GVERSION.$OS-$ARCH.tar.gz
+			ln -s /usr/local/go/bin/go /usr/bin/go
+			echo "Go Set-up Complete: $(go version)"
+		else
+			echo "Go installation exists. [skipping]"
+		fi
 
 		chown $cfn_cluster_user:$cfn_cluster_user -R /home/$cfn_cluster_user
 		chmod +x ${monitoring_home}/custom-metrics/* 
@@ -99,9 +114,10 @@ case "${cfn_node_type}" in
 		gpu_instances="[pg][2-9].*\.[0-9]*[x]*large"
 		if [[ $compute_instance_type =~ $gpu_instances ]]; then
 			distribution=$(. /etc/os-release;echo $ID$VERSION_ID)
-			curl -s -L https://nvidia.github.io/nvidia-docker/$distribution/nvidia-docker.repo | tee /etc/yum.repos.d/nvidia-docker.repo
-			yum -y clean expire-cache
-			yum -y install nvidia-docker2
+			curl -s -L https://nvidia.github.io/nvidia-docker/gpgkey | sudo apt-key add -
+			curl -s -L https://nvidia.github.io/nvidia-docker/$distribution/nvidia-docker.list | tee /etc/apt/sources.list.d/nvidia-docker.list
+
+			apt-get update && sudo apt-get install -y nvidia-container-toolkit
 			systemctl restart docker
 			/usr/local/bin/docker-compose -f /home/${cfn_cluster_user}/${monitoring_dir_name}/docker-compose/docker-compose.compute.gpu.yml -p monitoring-compute up -d
         	else
@@ -109,5 +125,5 @@ case "${cfn_node_type}" in
         	fi
 	;;
 	*)
-    	;;
+	;;
 esac
