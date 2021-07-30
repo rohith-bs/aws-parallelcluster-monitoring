@@ -12,7 +12,8 @@
 if [ ! -x "$(command -v docker)" ]; then
 	echo "Setting Up docker in rootless mode"
 	curl -fsSL https://get.docker.com | sh 
-	apt install -y newuidmap newgidmap
+	apt install -y uidmap 
+	dockerd-rootless-setuptool.sh install
 	echo "systemctl --user start docker" | sudo -u ${cfn_cluster_user}
 	echo "systemctl --user enable docker" | sudo -u ${cfn_cluster_user}
 	loginctl enable-linger ${cfn_cluster_user}
