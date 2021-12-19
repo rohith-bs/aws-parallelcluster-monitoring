@@ -83,7 +83,9 @@ case "${cfn_node_type}" in
 		##### Plese note this software package is under GPLv3 License #####
 		# More info here: https://github.com/vpenso/prometheus-slurm-exporter/blob/master/LICENSE
 		cd ${monitoring_home}
-		git clone https://github.com/rohith-bs/prometheus-slurm-exporter.git
+		# git clone https://github.com/rohith-bs/prometheus-slurm-exporter.git
+		git clone https://github.com/vpenso/prometheus-slurm-exporter.git
+		sed -i 's/NodeList,AllocMem,Memory,CPUsState,StateLong/NodeList: ,AllocMem: ,Memory: ,CPUsState: ,StateLong:/' prometheus-slurm-exporter/node.go
 		cd prometheus-slurm-exporter
 		GOPATH=/root/go-modules-cache HOME=/root go mod download
 		GOPATH=/root/go-modules-cache HOME=/root go build
@@ -108,6 +110,4 @@ case "${cfn_node_type}" in
 			/usr/local/bin/docker-compose -f /home/${cfn_cluster_user}/${monitoring_dir_name}/docker-compose/docker-compose.compute.yml -p monitoring-compute up -d
         	fi
 	;;
-	*)
-    	;;
 esac
