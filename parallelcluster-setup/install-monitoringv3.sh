@@ -10,27 +10,25 @@
 . /etc/parallelcluster/cfnconfig
 
 if [ ! -x "$(command -v docker)" ]; then
-	echo "Setting Up docker in rootless mode"
+	echo "Setting Up docker"
 	curl -fsSL https://get.docker.com | sh 
-	apt install -y uidmap 
-	dockerd-rootless-setuptool.sh install
-	echo "systemctl --user start docker" | sudo -u ${cfn_cluster_user}
-	echo "systemctl --user enable docker" | sudo -u ${cfn_cluster_user}
-	loginctl enable-linger ${cfn_cluster_user}
-	echo "export PATH=/usr/bin:\$PATH" >> /home/${cfn_cluster_user}/.bashrc
-	echo "export DOCKER_HOST=unix:///run/user/1000/docker.sock" >> /home/${cfn_cluster_user}/.bashrc
+	apt install -y docker
+	systemctl enable docker
+	systemctl start docker
+	usermod -a -G docker $cfn_cluster_user
 else
 	echo "Docker is already installed [skipping]."
 fi
 
-apt install -y docker-compose
+# apt install -y docker-compose
+sudo curl -L "https://github.com/docker/compose/releases/download/1.29.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+chmod +x /usr/local/bin/docker-compose
 
 monitoring_dir_name=$(echo ${cfn_postinstall_args}| cut -d ',' -f 2 )
 monitoring_home="/home/${cfn_cluster_user}/${monitoring_dir_name}"
 
 case "${cfn_node_type}" in
 	HeadNode)
-
 		#cfn_efs=$(cat /etc/chef/dna.json | grep \"cfn_efs\" | awk '{print $2}' | sed "s/\",//g;s/\"//g")
 		#cfn_cluster_cw_logging_enabled=$(cat /etc/chef/dna.json | grep \"cfn_cluster_cw_logging_enabled\" | awk '{print $2}' | sed "s/\",//g;s/\"//g")
 		cfn_fsx_fs_id=$(cat /etc/chef/dna.json | grep \"cfn_fsx_fs_id\" | awk '{print $2}' | sed "s/\",//g;s/\"//g")
