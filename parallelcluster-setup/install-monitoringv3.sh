@@ -29,7 +29,7 @@ monitoring_dir_name=$(echo ${cfn_postinstall_args}| cut -d ',' -f 2 )
 monitoring_home="/home/${cfn_cluster_user}/${monitoring_dir_name}"
 
 case "${cfn_node_type}" in
-	MasterServer)
+	HeadNode)
 
 		#cfn_efs=$(cat /etc/chef/dna.json | grep \"cfn_efs\" | awk '{print $2}' | sed "s/\",//g;s/\"//g")
 		#cfn_cluster_cw_logging_enabled=$(cat /etc/chef/dna.json | grep \"cfn_cluster_cw_logging_enabled\" | awk '{print $2}' | sed "s/\",//g;s/\"//g")
@@ -45,7 +45,7 @@ case "${cfn_node_type}" in
 		aws s3api get-object --bucket $cluster_s3_bucket --key $cluster_config_s3_key --region $cfn_region --version-id $cluster_config_version ${monitoring_home}/parallelcluster-setup/cluster-config.json
 
 		if [ ! -x "$(command -v go)" ]; then
-			export GVERSION=1.14.12 OS=linux ARCH=amd64
+			export GVERSION=1.17.5 OS=linux ARCH=amd64
 			echo "Setting up GO"
 			wget -c https://dl.google.com/go/go$GVERSION.$OS-$ARCH.tar.gz 
 			tar -xzf go$GVERSION.$OS-$ARCH.tar.gz -C /usr/local/ && rm go$GVERSION.$OS-$ARCH.tar.gz
@@ -99,9 +99,7 @@ case "${cfn_node_type}" in
 		##### Plese note this software package is under GPLv3 License #####
 		# More info here: https://github.com/vpenso/prometheus-slurm-exporter/blob/master/LICENSE
 		cd ${monitoring_home}
-		# git clone https://github.com/rohith-bs/prometheus-slurm-exporter.git
-		git clone https://github.com/vpenso/prometheus-slurm-exporter.git
-		sed -i 's/NodeList,AllocMem,Memory,CPUsState,StateLong/NodeList: ,AllocMem: ,Memory: ,CPUsState: ,StateLong:/' prometheus-slurm-exporter/node.go
+		git clone https://github.com/rohith-bs/prometheus-slurm-exporter.git
 		cd prometheus-slurm-exporter
 		GOPATH=/root/go-modules-cache HOME=/root go mod download
 		GOPATH=/root/go-modules-cache HOME=/root go build
@@ -117,10 +115,9 @@ case "${cfn_node_type}" in
 		gpu_instances="[pg][2-9].*\.[0-9]*[x]*large"
 		if [[ $compute_instance_type =~ $gpu_instances ]]; then
 			distribution=$(. /etc/os-release;echo $ID$VERSION_ID)
-			curl -s -L https://nvidia.github.io/nvidia-docker/gpgkey | sudo apt-key add -
-			curl -s -L https://nvidia.github.io/nvidia-docker/$distribution/nvidia-docker.list | tee /etc/apt/sources.list.d/nvidia-docker.list
-
-			apt-get update && sudo apt-get install -y nvidia-container-toolkit
+			curl -s -L https://nvidia.github.io/nvidia-docker/$distribution/nvidia-docker.repo | tee /etc/yum.repos.d/nvidia-docker.repo
+			yum -y clean expire-cache
+			yum -y install nvidia-docker2
 			systemctl restart docker
 			/usr/local/bin/docker-compose -f /home/${cfn_cluster_user}/${monitoring_dir_name}/docker-compose/docker-compose.compute.gpu.yml -p monitoring-compute up -d
         	else
