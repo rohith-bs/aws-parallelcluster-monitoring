@@ -28,8 +28,10 @@ scrape_configs:
     ec2_sd_configs:
       - port: 9100
         refresh_interval: 10s
+        region: us-east-1
       - port: 9400
         refresh_interval: 10s
+        region: us-east-1
         filters:
           - name: instance-state-name
             values:
